@@ -13,13 +13,20 @@ class EstrategiaTrading:
         self.log_system = log_system
         self.ticket_atual = None
 
-        # Parâmetros de configuração
-        self.rsi_sobrecomprado = 70
-        self.rsi_sobrevendido = 30
-        self.bb_desvio = 2.0
-        self.atr_period = 14
+        # Parâmetros otimizados para maior assertividade
+        self.rsi_sobrecomprado = 75  # Mais conservador para vendas
+        self.rsi_sobrevendido = 25   # Mais conservador para compras
+        self.bb_desvio = 2.5         # Bandas mais largas para sinais mais fortes
+        self.atr_period = 21         # Período maior para volatilidade mais estável
         self.stoch_period = 14
-        self.volume_threshold = 1.5
+        self.volume_threshold = 2.0   # Volume mais significativo
+        
+        # Novos parâmetros para gestão de risco
+        self.max_daily_loss = 5.0    # Máximo de perda diária em %
+        self.min_rr_ratio = 2.0      # Mínimo risk/reward ratio
+        self.max_positions = 3        # Máximo de posições simultâneas
+        self.trailing_stop = True     # Ativar trailing stop
+        self.breakeven_level = 1.0    # ATR para mover stop ao breakeven
 
     def converter_timeframe(self, tf):
         mapping = {
@@ -82,74 +89,215 @@ class EstrategiaTrading:
         # Análise de Momentum
         momentum = self.momentum(close, 10)
 
-        # Condições de entrada
-        self.log_system.logar("🎯 Verificando sinais de entrada...")
+        # Análise avançada de tendência e momentum
+        if self.operando:
+            self.log_system.logar("🔍 Iniciando análise de mercado...")
         
-        tendencia_alta = (ema9[-1] > ema21[-1] > ema50[-1]) and (close[-1] > ema9[-1])
-        tendencia_baixa = (ema9[-1] < ema21[-1] < ema50[-1]) and (close[-1] < ema9[-1])
+        # Tendência principal (múltiplos timeframes)
+        tendencia_alta = (
+            (ema9[-1] > ema21[-1] > ema50[-1]) and  # Tendência de curto prazo
+            (close[-1] > ema9[-1]) and              # Preço acima da média curta
+            (ema9[-1] > ema9[-2]) and              # Inclinação positiva
+            (min(close[-5:]) > ema21[-1])          # Suporte na média intermediária
+        )
+        
+        tendencia_baixa = (
+            (ema9[-1] < ema21[-1] < ema50[-1]) and  # Tendência de curto prazo
+            (close[-1] < ema9[-1]) and              # Preço abaixo da média curta
+            (ema9[-1] < ema9[-2]) and              # Inclinação negativa
+            (max(close[-5:]) < ema21[-1])          # Resistência na média intermediária
+        )
 
-        # Confirmação MACD
-        macd_compra = macd_line[-2] < signal_line[-2] and macd_line[-1] > signal_line[-1]
-        macd_venda = macd_line[-2] > signal_line[-2] and macd_line[-1] < signal_line[-1]
+        # Análise de momentum melhorada
+        momentum_positivo = (
+            momentum[-1] > 0 and
+            momentum[-1] > momentum[-2] and
+            np.mean(momentum[-5:]) > 0              # Momentum médio positivo
+        )
+        
+        momentum_negativo = (
+            momentum[-1] < 0 and
+            momentum[-1] < momentum[-2] and
+            np.mean(momentum[-5:]) < 0              # Momentum médio negativo
+        )
 
-        # Confirmação RSI
-        rsi_compra = rsi_valores[-2] < self.rsi_sobrevendido and rsi_valores[-1] > self.rsi_sobrevendido
-        rsi_venda = rsi_valores[-2] > self.rsi_sobrecomprado and rsi_valores[-1] < self.rsi_sobrecomprado
+        # Confirmações técnicas refinadas
+        rsi_compra = (
+            rsi_valores[-1] < self.rsi_sobrevendido and
+            rsi_valores[-1] > rsi_valores[-2] and    # RSI subindo
+            min(rsi_valores[-3:]) < self.rsi_sobrevendido  # Confirmação da zona
+        )
+        
+        rsi_venda = (
+            rsi_valores[-1] > self.rsi_sobrecomprado and
+            rsi_valores[-1] < rsi_valores[-2] and    # RSI caindo
+            max(rsi_valores[-3:]) > self.rsi_sobrecomprado  # Confirmação da zona
+        )
 
-        # Confirmação Estocástico
-        stoch_compra = stoch_k[-1] < 20 and stoch_d[-1] < 20 and stoch_k[-1] > stoch_d[-1]
-        stoch_venda = stoch_k[-1] > 80 and stoch_d[-1] > 80 and stoch_k[-1] < stoch_d[-1]
+        # Divergências e convergências
+        macd_compra = (
+            macd_line[-1] > signal_line[-1] and     # MACD acima da signal
+            macd_line[-1] > macd_line[-2] and       # MACD subindo
+            macd_line[-1] > 0                       # MACD positivo
+        )
+        
+        macd_venda = (
+            macd_line[-1] < signal_line[-1] and     # MACD abaixo da signal
+            macd_line[-1] < macd_line[-2] and       # MACD caindo
+            macd_line[-1] < 0                       # MACD negativo
+        )
 
-        # Confirmação Momentum
-        momentum_positivo = momentum[-1] > 0 and momentum[-2] < momentum[-1]
-        momentum_negativo = momentum[-1] < 0 and momentum[-2] > momentum[-1]
+        # Confirmação por volume e preço
+        stoch_compra = (
+            stoch_k[-1] < 30 and                    # Mais conservador
+            stoch_k[-1] > stoch_d[-1] and           # Cruzamento positivo
+            stoch_k[-1] > stoch_k[-2]               # Estocástico subindo
+        )
+        
+        stoch_venda = (
+            stoch_k[-1] > 70 and                    # Mais conservador
+            stoch_k[-1] < stoch_d[-1] and           # Cruzamento negativo
+            stoch_k[-1] < stoch_k[-2]               # Estocástico caindo
+        )
 
-        # Sinais de entrada combinados
+        # Análise de Fibonacci e Suporte/Resistência
+        fib_retracement = self.calcular_fibonacci(high, low)
+        
+        # Sinais de entrada otimizados
         sinal_compra = (
-                tendencia_alta and
-                (macd_compra or rsi_compra) and
-                stoch_compra and
-                momentum_positivo and
-                volume_alto and
-                close[-1] < bb_superior
+            tendencia_alta and                      # Tendência principal
+            (macd_compra and rsi_compra) and        # Confirmação obrigatória de ambos
+            stoch_compra and                        # Confirmação estocástica
+            momentum_positivo and                   # Momentum forte
+            volume_alto and                         # Volume significativo
+            close[-1] < bb_superior and            # Dentro das Bandas
+            self.verificar_suporte(close[-1], fib_retracement) and  # Próximo ao suporte
+            self.verificar_horario_favoravel() and  # Horário adequado
+            self.verificar_risco_posicao()          # Gestão de risco ok
         )
 
         sinal_venda = (
-                tendencia_baixa and
-                (macd_venda or rsi_venda) and
-                stoch_venda and
-                momentum_negativo and
-                volume_alto and
-                close[-1] > bb_inferior
+            tendencia_baixa and                     # Tendência principal
+            (macd_venda and rsi_venda) and         # Confirmação obrigatória de ambos
+            stoch_venda and                        # Confirmação estocástica
+            momentum_negativo and                  # Momentum forte
+            volume_alto and                        # Volume significativo
+            close[-1] > bb_inferior and           # Dentro das Bandas
+            self.verificar_resistencia(close[-1], fib_retracement) and  # Próximo à resistência
+            self.verificar_horario_favoravel() and # Horário adequado
+            self.verificar_risco_posicao()         # Gestão de risco ok
         )
 
-        # Cálculo dinâmico de Stop Loss e Take Profit baseado no ATR
+        # Gestão de Risco e Execução
         atr_atual = atr[-1]
-
+        
         if sinal_compra:
-            self.log_system.logar("🔵 Sinal de COMPRA forte detectado!")
-            self.log_system.logar(f"📊 RSI: {rsi_valores[-1]:.2f}")
-            self.log_system.logar(f"📊 Estocástico K: {stoch_k[-1]:.2f}, D: {stoch_d[-1]:.2f}")
-            self.log_system.logar(f"📊 Volume: {volume_atual:.2f} (MA: {volume_ma:.2f})")
+            # Primeiro aviso de possível compra
+            if (tendencia_alta and macd_compra and rsi_compra):
+                self.log_system.logar("🔵 Possível sinal de COMPRA detectado - Aguardando confirmação...")
+                self.log_system.logar("📊 Condições favoráveis:")
+                self.log_system.logar(f"  • Tendência: ALTA")
+                self.log_system.logar(f"  • RSI: {rsi_valores[-1]:.2f}")
+                self.log_system.logar(f"  • MACD: Positivo")
+            
+            # Stop Loss e Take Profit otimizados
             sl_distance = atr_atual * 1.5
-            tp_distance = atr_atual * 2.5
-            self.abrir_ordem(mt5.ORDER_TYPE_BUY, sl_distance, tp_distance)
+            tp_distance = atr_atual * self.min_rr_ratio * 1.5
+            
+            if self.verificar_risco_recompensa(sl_distance, tp_distance):
+                self.abrir_ordem(mt5.ORDER_TYPE_BUY, sl_distance, tp_distance)
+            else:
+                if self.operando:
+                    self.log_system.logar("⚠️ Operação cancelada: Risk/Reward inadequado")
 
         elif sinal_venda:
-            self.log_system.logar("🔴 Sinal de VENDA forte detectado!")
-            self.log_system.logar(f"📊 RSI: {rsi_valores[-1]:.2f}")
-            self.log_system.logar(f"📊 Estocástico K: {stoch_k[-1]:.2f}, D: {stoch_d[-1]:.2f}")
-            self.log_system.logar(f"📊 Volume: {volume_atual:.2f} (MA: {volume_ma:.2f})")
+            # Primeiro aviso de possível venda
+            if (tendencia_baixa and macd_venda and rsi_venda):
+                self.log_system.logar("🔴 Possível sinal de VENDA detectado - Aguardando confirmação...")
+                self.log_system.logar("📊 Condições favoráveis:")
+                self.log_system.logar(f"  • Tendência: BAIXA")
+                self.log_system.logar(f"  • RSI: {rsi_valores[-1]:.2f}")
+                self.log_system.logar(f"  • MACD: Negativo")
+            
+            # Stop Loss e Take Profit otimizados
             sl_distance = atr_atual * 1.5
-            tp_distance = atr_atual * 2.5
-            self.abrir_ordem(mt5.ORDER_TYPE_SELL, sl_distance, tp_distance)
-        else:
-            self.log_system.logar("⏸️ Aguardando melhores condições de mercado...")
+            tp_distance = atr_atual * self.min_rr_ratio * 1.5
+            
+            if self.verificar_risco_recompensa(sl_distance, tp_distance):
+                self.abrir_ordem(mt5.ORDER_TYPE_SELL, sl_distance, tp_distance)
+            else:
+                if self.operando:
+                    self.log_system.logar("⚠️ Operação cancelada: Risk/Reward inadequado")
+        elif not self.operando:
+            return
+
+    def calcular_fibonacci(self, high, low):
+        """Calcula níveis de Fibonacci"""
+        diff = high[-1] - low[-1]
+        return {
+            'nivel_236': low[-1] + diff * 0.236,
+            'nivel_382': low[-1] + diff * 0.382,
+            'nivel_500': low[-1] + diff * 0.500,
+            'nivel_618': low[-1] + diff * 0.618,
+            'nivel_786': low[-1] + diff * 0.786
+        }
+
+    def verificar_suporte(self, preco, fib_levels):
+        """Verifica se o preço está próximo a um suporte de Fibonacci"""
+        tolerancia = 0.001  # 0.1% de tolerância
+        for nivel in fib_levels.values():
+            if abs(preco - nivel) / preco < tolerancia:
+                return True
+        return False
+
+    def verificar_resistencia(self, preco, fib_levels):
+        """Verifica se o preço está próximo a uma resistência de Fibonacci"""
+        tolerancia = 0.001  # 0.1% de tolerância
+        for nivel in fib_levels.values():
+            if abs(preco - nivel) / preco < tolerancia:
+                return True
+        return False
+
+    def verificar_horario_favoravel(self):
+        """Verifica se o horário atual é favorável para operar"""
+        hora_atual = pd.Timestamp.now().time()
+        # Evita horários de baixa liquidez e alta volatilidade
+        if (hora_atual >= pd.Timestamp('09:30').time() and 
+            hora_atual <= pd.Timestamp('16:30').time()):
+            return True
+        return False
+
+    def verificar_risco_posicao(self):
+        """Verifica se a posição atende aos critérios de risco"""
+        # Verifica número máximo de posições
+        posicoes = mt5.positions_total()
+        if posicoes >= self.max_positions:
+            if self.operando:
+                self.log_system.logar("⚠️ Máximo de posições atingido")
+            return False
+            
+        # Verifica drawdown diário
+        saldo_inicial = mt5.account_info().balance
+        saldo_atual = mt5.account_info().equity
+        drawdown = (saldo_inicial - saldo_atual) / saldo_inicial * 100
+        
+        if drawdown > self.max_daily_loss:
+            if self.operando:
+                self.log_system.logar(f"⚠️ Máximo drawdown diário atingido: {drawdown:.2f}%")
+            return False
+            
+        return True
+
+    def verificar_risco_recompensa(self, sl_distance, tp_distance):
+        """Verifica se o trade atende ao mínimo de risk/reward"""
+        rr_ratio = tp_distance / sl_distance
+        return rr_ratio >= self.min_rr_ratio
 
     def abrir_ordem(self, tipo_ordem, sl_distance, tp_distance):
         tick = mt5.symbol_info_tick(self.ativo)
         if tick is None:
-            self.log_system.logar("❌ Erro ao obter cotação atual")
+            if self.operando:
+                self.log_system.logar("❌ Erro ao obter cotação atual")
             return
 
         preco = tick.ask if tipo_ordem == mt5.ORDER_TYPE_BUY else tick.bid
@@ -177,15 +325,18 @@ class EstrategiaTrading:
         resultado = mt5.order_send(request)
 
         if resultado.retcode != mt5.TRADE_RETCODE_DONE:
-            self.log_system.logar(f"❌ Erro ao enviar ordem: {resultado.comment}")
+            if self.operando:
+                self.log_system.logar(f"❌ Erro ao enviar ordem: {resultado.comment}")
         else:
             self.ticket_atual = resultado.order
             direcao = "COMPRA" if tipo_ordem == mt5.ORDER_TYPE_BUY else "VENDA"
-            self.log_system.logar(f"✅ Ordem de {direcao} enviada com sucesso!")
-            self.log_system.logar(f"🎫 Ticket: {self.ticket_atual}")
-            self.log_system.logar(f"💰 Preço: {preco:.5f}")
-            self.log_system.logar(f"🛡️ Stop Loss: {sl:.5f}")
-            self.log_system.logar(f"🎯 Take Profit: {tp:.5f}")
+            if self.operando:
+                self.log_system.logar(f"✅ ORDEM DE {direcao} CONFIRMADA E EXECUTADA!")
+                self.log_system.logar(f"📊 Detalhes da Ordem:")
+                self.log_system.logar(f"  • Ticket: {self.ticket_atual}")
+                self.log_system.logar(f"  • Preço: {preco:.5f}")
+                self.log_system.logar(f"  • Stop Loss: {sl:.5f}")
+                self.log_system.logar(f"  • Take Profit: {tp:.5f}")
 
     # --- Indicadores Técnicos ---
     def ema(self, data, period):
