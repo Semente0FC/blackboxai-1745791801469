@@ -113,93 +113,117 @@ class EstrategiaTrading:
             self.log_system.logar("🔍 Iniciando análise de mercado...")
         
         # Tendência simplificada
-        tendencia_alta = all([
-            ema9[-1] > ema21[-1],     # Tendência de curto prazo
-            close[-1] > ema9[-1],      # Preço acima da média curta
-            ema9[-1] > ema9[-2]       # Inclinação positiva
-        ])
+        tendencia_alta = bool(
+            np.all([
+                float(ema9[-1]) > float(ema21[-1]),     # Tendência de curto prazo
+                float(close[-1]) > float(ema9[-1]),      # Preço acima da média curta
+                float(ema9[-1]) > float(ema9[-2])       # Inclinação positiva
+            ])
+        )
         
-        tendencia_baixa = all([
-            ema9[-1] < ema21[-1],     # Tendência de curto prazo
-            close[-1] < ema9[-1],      # Preço abaixo da média curta
-            ema9[-1] < ema9[-2]       # Inclinação negativa
-        ])
+        tendencia_baixa = bool(
+            np.all([
+                float(ema9[-1]) < float(ema21[-1]),     # Tendência de curto prazo
+                float(close[-1]) < float(ema9[-1]),      # Preço abaixo da média curta
+                float(ema9[-1]) < float(ema9[-2])       # Inclinação negativa
+            ])
+        )
 
         # Análise de momentum melhorada
-        momentum_positivo = all([
-            momentum[-1] > 0,
-            momentum[-1] > momentum[-2],
-            np.mean(momentum[-5:]) > 0              # Momentum médio positivo
-        ])
+        momentum_positivo = bool(
+            np.all([
+                float(momentum[-1]) > 0,
+                float(momentum[-1]) > float(momentum[-2]),
+                float(np.mean(momentum[-5:])) > 0        # Momentum médio positivo
+            ])
+        )
         
-        momentum_negativo = all([
-            momentum[-1] < 0,
-            momentum[-1] < momentum[-2],
-            np.mean(momentum[-5:]) < 0              # Momentum médio negativo
-        ])
+        momentum_negativo = bool(
+            np.all([
+                float(momentum[-1]) < 0,
+                float(momentum[-1]) < float(momentum[-2]),
+                float(np.mean(momentum[-5:])) < 0        # Momentum médio negativo
+            ])
+        )
 
         # Confirmações técnicas refinadas
-        rsi_compra = all([
-            rsi_valores[-1] < self.rsi_sobrevendido,
-            rsi_valores[-1] > rsi_valores[-2],    # RSI subindo
-            min(rsi_valores[-3:]) < self.rsi_sobrevendido  # Confirmação da zona
-        ])
+        rsi_compra = bool(
+            np.all([
+                float(rsi_valores[-1]) < self.rsi_sobrevendido,
+                float(rsi_valores[-1]) > float(rsi_valores[-2]),    # RSI subindo
+                float(np.min(rsi_valores[-3:])) < self.rsi_sobrevendido  # Confirmação da zona
+            ])
+        )
         
-        rsi_venda = all([
-            rsi_valores[-1] > self.rsi_sobrecomprado,
-            rsi_valores[-1] < rsi_valores[-2],    # RSI caindo
-            max(rsi_valores[-3:]) > self.rsi_sobrecomprado  # Confirmação da zona
-        ])
+        rsi_venda = bool(
+            np.all([
+                float(rsi_valores[-1]) > self.rsi_sobrecomprado,
+                float(rsi_valores[-1]) < float(rsi_valores[-2]),    # RSI caindo
+                float(np.max(rsi_valores[-3:])) > self.rsi_sobrecomprado  # Confirmação da zona
+            ])
+        )
 
         # Divergências e convergências
-        macd_compra = all([
-            macd_line[-1] > signal_line[-1],     # MACD acima da signal
-            macd_line[-1] > macd_line[-2],       # MACD subindo
-            macd_line[-1] > 0                    # MACD positivo
-        ])
+        macd_compra = bool(
+            np.all([
+                float(macd_line[-1]) > float(signal_line[-1]),     # MACD acima da signal
+                float(macd_line[-1]) > float(macd_line[-2]),       # MACD subindo
+                float(macd_line[-1]) > 0                           # MACD positivo
+            ])
+        )
         
-        macd_venda = all([
-            macd_line[-1] < signal_line[-1],     # MACD abaixo da signal
-            macd_line[-1] < macd_line[-2],       # MACD caindo
-            macd_line[-1] < 0                    # MACD negativo
-        ])
+        macd_venda = bool(
+            np.all([
+                float(macd_line[-1]) < float(signal_line[-1]),     # MACD abaixo da signal
+                float(macd_line[-1]) < float(macd_line[-2]),       # MACD caindo
+                float(macd_line[-1]) < 0                           # MACD negativo
+            ])
+        )
 
         # Confirmação por volume e preço
-        stoch_compra = all([
-            stoch_k[-1] < 30,                    # Mais conservador
-            stoch_k[-1] > stoch_d[-1],           # Cruzamento positivo
-            stoch_k[-1] > stoch_k[-2]            # Estocástico subindo
-        ])
+        stoch_compra = bool(
+            np.all([
+                float(stoch_k[-1]) < 30,                           # Mais conservador
+                float(stoch_k[-1]) > float(stoch_d[-1]),          # Cruzamento positivo
+                float(stoch_k[-1]) > float(stoch_k[-2])           # Estocástico subindo
+            ])
+        )
         
-        stoch_venda = all([
-            stoch_k[-1] > 70,                    # Mais conservador
-            stoch_k[-1] < stoch_d[-1],           # Cruzamento negativo
-            stoch_k[-1] < stoch_k[-2]            # Estocástico caindo
-        ])
+        stoch_venda = bool(
+            np.all([
+                float(stoch_k[-1]) > 70,                          # Mais conservador
+                float(stoch_k[-1]) < float(stoch_d[-1]),         # Cruzamento negativo
+                float(stoch_k[-1]) < float(stoch_k[-2])          # Estocástico caindo
+            ])
+        )
 
         # Análise de Fibonacci e Suporte/Resistência
         fib_retracement = self.calcular_fibonacci(high, low)
         
         # Sinais de entrada mais dinâmicos
-        sinal_compra = all([
-            tendencia_alta,                  # Tendência de curto prazo
-            any([macd_compra, rsi_compra]),    # Apenas uma confirmação necessária
-            any([stoch_compra, momentum_positivo]),  # Flexibilidade na confirmação
-            volume_alto,                     # Volume ainda importante
-            close[-1] < bb_superior,        # Dentro das Bandas
-            self.verificar_horario_favoravel(),  # Horário adequado
-            self.verificar_risco_posicao()      # Gestão de risco ok
-        ])
+        sinal_compra = bool(
+            np.all([
+                tendencia_alta,                  # Tendência de curto prazo
+                macd_compra or rsi_compra,      # Apenas uma confirmação necessária
+                stoch_compra or momentum_positivo,  # Flexibilidade na confirmação
+                volume_alto,                     # Volume ainda importante
+                float(close[-1]) < float(bb_superior[-1]),  # Dentro das Bandas
+                self.verificar_horario_favoravel(),  # Horário adequado
+                self.verificar_risco_posicao()      # Gestão de risco ok
+            ])
+        )
 
-        sinal_venda = all([
-            tendencia_baixa,                 # Tendência de curto prazo
-            any([macd_venda, rsi_venda]),      # Apenas uma confirmação necessária
-            any([stoch_venda, momentum_negativo]),  # Flexibilidade na confirmação
-            volume_alto,                     # Volume ainda importante
-            close[-1] > bb_inferior,        # Dentro das Bandas
-            self.verificar_horario_favoravel(),  # Horário adequado
-            self.verificar_risco_posicao()      # Gestão de risco ok
-        ])
+        sinal_venda = bool(
+            np.all([
+                tendencia_baixa,                 # Tendência de curto prazo
+                macd_venda or rsi_venda,        # Apenas uma confirmação necessária
+                stoch_venda or momentum_negativo,  # Flexibilidade na confirmação
+                volume_alto,                     # Volume ainda importante
+                float(close[-1]) > float(bb_inferior[-1]),  # Dentro das Bandas
+                self.verificar_horario_favoravel(),  # Horário adequado
+                self.verificar_risco_posicao()      # Gestão de risco ok
+            ])
+        )
 
         if self.operando:
             # Mostrar análise detalhada
