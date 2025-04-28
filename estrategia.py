@@ -113,93 +113,93 @@ class EstrategiaTrading:
             self.log_system.logar("🔍 Iniciando análise de mercado...")
         
         # Tendência simplificada
-        tendencia_alta = (
-            (ema9[-1] > ema21[-1]) and     # Tendência de curto prazo
-            (close[-1] > ema9[-1]) and      # Preço acima da média curta
-            (ema9[-1] > ema9[-2])          # Inclinação positiva
-        )
+        tendencia_alta = all([
+            ema9[-1] > ema21[-1],     # Tendência de curto prazo
+            close[-1] > ema9[-1],      # Preço acima da média curta
+            ema9[-1] > ema9[-2]       # Inclinação positiva
+        ])
         
-        tendencia_baixa = (
-            (ema9[-1] < ema21[-1]) and     # Tendência de curto prazo
-            (close[-1] < ema9[-1]) and      # Preço abaixo da média curta
-            (ema9[-1] < ema9[-2])          # Inclinação negativa
-        )
+        tendencia_baixa = all([
+            ema9[-1] < ema21[-1],     # Tendência de curto prazo
+            close[-1] < ema9[-1],      # Preço abaixo da média curta
+            ema9[-1] < ema9[-2]       # Inclinação negativa
+        ])
 
         # Análise de momentum melhorada
-        momentum_positivo = (
-            momentum[-1] > 0 and
-            momentum[-1] > momentum[-2] and
+        momentum_positivo = all([
+            momentum[-1] > 0,
+            momentum[-1] > momentum[-2],
             np.mean(momentum[-5:]) > 0              # Momentum médio positivo
-        )
+        ])
         
-        momentum_negativo = (
-            momentum[-1] < 0 and
-            momentum[-1] < momentum[-2] and
+        momentum_negativo = all([
+            momentum[-1] < 0,
+            momentum[-1] < momentum[-2],
             np.mean(momentum[-5:]) < 0              # Momentum médio negativo
-        )
+        ])
 
         # Confirmações técnicas refinadas
-        rsi_compra = (
-            rsi_valores[-1] < self.rsi_sobrevendido and
-            rsi_valores[-1] > rsi_valores[-2] and    # RSI subindo
+        rsi_compra = all([
+            rsi_valores[-1] < self.rsi_sobrevendido,
+            rsi_valores[-1] > rsi_valores[-2],    # RSI subindo
             min(rsi_valores[-3:]) < self.rsi_sobrevendido  # Confirmação da zona
-        )
+        ])
         
-        rsi_venda = (
-            rsi_valores[-1] > self.rsi_sobrecomprado and
-            rsi_valores[-1] < rsi_valores[-2] and    # RSI caindo
+        rsi_venda = all([
+            rsi_valores[-1] > self.rsi_sobrecomprado,
+            rsi_valores[-1] < rsi_valores[-2],    # RSI caindo
             max(rsi_valores[-3:]) > self.rsi_sobrecomprado  # Confirmação da zona
-        )
+        ])
 
         # Divergências e convergências
-        macd_compra = (
-            macd_line[-1] > signal_line[-1] and     # MACD acima da signal
-            macd_line[-1] > macd_line[-2] and       # MACD subindo
-            macd_line[-1] > 0                       # MACD positivo
-        )
+        macd_compra = all([
+            macd_line[-1] > signal_line[-1],     # MACD acima da signal
+            macd_line[-1] > macd_line[-2],       # MACD subindo
+            macd_line[-1] > 0                    # MACD positivo
+        ])
         
-        macd_venda = (
-            macd_line[-1] < signal_line[-1] and     # MACD abaixo da signal
-            macd_line[-1] < macd_line[-2] and       # MACD caindo
-            macd_line[-1] < 0                       # MACD negativo
-        )
+        macd_venda = all([
+            macd_line[-1] < signal_line[-1],     # MACD abaixo da signal
+            macd_line[-1] < macd_line[-2],       # MACD caindo
+            macd_line[-1] < 0                    # MACD negativo
+        ])
 
         # Confirmação por volume e preço
-        stoch_compra = (
-            stoch_k[-1] < 30 and                    # Mais conservador
-            stoch_k[-1] > stoch_d[-1] and           # Cruzamento positivo
-            stoch_k[-1] > stoch_k[-2]               # Estocástico subindo
-        )
+        stoch_compra = all([
+            stoch_k[-1] < 30,                    # Mais conservador
+            stoch_k[-1] > stoch_d[-1],           # Cruzamento positivo
+            stoch_k[-1] > stoch_k[-2]            # Estocástico subindo
+        ])
         
-        stoch_venda = (
-            stoch_k[-1] > 70 and                    # Mais conservador
-            stoch_k[-1] < stoch_d[-1] and           # Cruzamento negativo
-            stoch_k[-1] < stoch_k[-2]               # Estocástico caindo
-        )
+        stoch_venda = all([
+            stoch_k[-1] > 70,                    # Mais conservador
+            stoch_k[-1] < stoch_d[-1],           # Cruzamento negativo
+            stoch_k[-1] < stoch_k[-2]            # Estocástico caindo
+        ])
 
         # Análise de Fibonacci e Suporte/Resistência
         fib_retracement = self.calcular_fibonacci(high, low)
         
         # Sinais de entrada mais dinâmicos
-        sinal_compra = (
-            tendencia_alta and                  # Tendência de curto prazo
-            (macd_compra or rsi_compra) and    # Apenas uma confirmação necessária
-            (stoch_compra or momentum_positivo) and  # Flexibilidade na confirmação
-            volume_alto and                     # Volume ainda importante
-            close[-1] < bb_superior and        # Dentro das Bandas
-            self.verificar_horario_favoravel() and  # Horário adequado
+        sinal_compra = all([
+            tendencia_alta,                  # Tendência de curto prazo
+            any([macd_compra, rsi_compra]),    # Apenas uma confirmação necessária
+            any([stoch_compra, momentum_positivo]),  # Flexibilidade na confirmação
+            volume_alto,                     # Volume ainda importante
+            close[-1] < bb_superior,        # Dentro das Bandas
+            self.verificar_horario_favoravel(),  # Horário adequado
             self.verificar_risco_posicao()      # Gestão de risco ok
-        )
+        ])
 
-        sinal_venda = (
-            tendencia_baixa and                 # Tendência de curto prazo
-            (macd_venda or rsi_venda) and      # Apenas uma confirmação necessária
-            (stoch_venda or momentum_negativo) and  # Flexibilidade na confirmação
-            volume_alto and                     # Volume ainda importante
-            close[-1] > bb_inferior and        # Dentro das Bandas
-            self.verificar_horario_favoravel() and  # Horário adequado
+        sinal_venda = all([
+            tendencia_baixa,                 # Tendência de curto prazo
+            any([macd_venda, rsi_venda]),      # Apenas uma confirmação necessária
+            any([stoch_venda, momentum_negativo]),  # Flexibilidade na confirmação
+            volume_alto,                     # Volume ainda importante
+            close[-1] > bb_inferior,        # Dentro das Bandas
+            self.verificar_horario_favoravel(),  # Horário adequado
             self.verificar_risco_posicao()      # Gestão de risco ok
-        )
+        ])
 
         if self.operando:
             # Mostrar análise detalhada
