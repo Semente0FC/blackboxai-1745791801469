@@ -13,20 +13,20 @@ class EstrategiaTrading:
         self.log_system = log_system
         self.ticket_atual = None
 
-        # Parâmetros otimizados para maior assertividade
-        self.rsi_sobrecomprado = 75  # Mais conservador para vendas
-        self.rsi_sobrevendido = 25   # Mais conservador para compras
-        self.bb_desvio = 2.5         # Bandas mais largas para sinais mais fortes
-        self.atr_period = 21         # Período maior para volatilidade mais estável
+        # Parâmetros mais dinâmicos para capturar mais oportunidades
+        self.rsi_sobrecomprado = 65  # Menos restritivo para vendas
+        self.rsi_sobrevendido = 35   # Menos restritivo para compras
+        self.bb_desvio = 2.0         # Bandas mais próximas
+        self.atr_period = 14         # Período menor para mais sensibilidade
         self.stoch_period = 14
-        self.volume_threshold = 2.0   # Volume mais significativo
+        self.volume_threshold = 1.5   # Volume menos restritivo
         
-        # Novos parâmetros para gestão de risco
+        # Parâmetros de gestão de risco balanceados
         self.max_daily_loss = 5.0    # Máximo de perda diária em %
-        self.min_rr_ratio = 2.0      # Mínimo risk/reward ratio
-        self.max_positions = 3        # Máximo de posições simultâneas
+        self.min_rr_ratio = 1.5      # Risk/Reward mais agressivo
+        self.max_positions = 5        # Mais posições simultâneas
         self.trailing_stop = True     # Ativar trailing stop
-        self.breakeven_level = 1.0    # ATR para mover stop ao breakeven
+        self.breakeven_level = 0.5    # Mais rápido para breakeven
 
     def converter_timeframe(self, tf):
         mapping = {
@@ -145,19 +145,17 @@ class EstrategiaTrading:
         if self.operando:
             self.log_system.logar("🔍 Iniciando análise de mercado...")
         
-        # Tendência principal (múltiplos timeframes)
+        # Tendência simplificada
         tendencia_alta = (
-            (ema9[-1] > ema21[-1] > ema50[-1]) and  # Tendência de curto prazo
-            (close[-1] > ema9[-1]) and              # Preço acima da média curta
-            (ema9[-1] > ema9[-2]) and              # Inclinação positiva
-            (min(close[-5:]) > ema21[-1])          # Suporte na média intermediária
+            (ema9[-1] > ema21[-1]) and     # Tendência de curto prazo
+            (close[-1] > ema9[-1]) and      # Preço acima da média curta
+            (ema9[-1] > ema9[-2])          # Inclinação positiva
         )
         
         tendencia_baixa = (
-            (ema9[-1] < ema21[-1] < ema50[-1]) and  # Tendência de curto prazo
-            (close[-1] < ema9[-1]) and              # Preço abaixo da média curta
-            (ema9[-1] < ema9[-2]) and              # Inclinação negativa
-            (max(close[-5:]) < ema21[-1])          # Resistência na média intermediária
+            (ema9[-1] < ema21[-1]) and     # Tendência de curto prazo
+            (close[-1] < ema9[-1]) and      # Preço abaixo da média curta
+            (ema9[-1] < ema9[-2])          # Inclinação negativa
         )
 
         # Análise de momentum melhorada
@@ -215,29 +213,25 @@ class EstrategiaTrading:
         # Análise de Fibonacci e Suporte/Resistência
         fib_retracement = self.calcular_fibonacci(high, low)
         
-        # Sinais de entrada otimizados
+        # Sinais de entrada mais dinâmicos
         sinal_compra = (
-            tendencia_alta and                      # Tendência principal
-            (macd_compra and rsi_compra) and        # Confirmação obrigatória de ambos
-            stoch_compra and                        # Confirmação estocástica
-            momentum_positivo and                   # Momentum forte
-            volume_alto and                         # Volume significativo
-            close[-1] < bb_superior and            # Dentro das Bandas
-            self.verificar_suporte(close[-1], fib_retracement) and  # Próximo ao suporte
+            tendencia_alta and                  # Tendência de curto prazo
+            (macd_compra or rsi_compra) and    # Apenas uma confirmação necessária
+            (stoch_compra or momentum_positivo) and  # Flexibilidade na confirmação
+            volume_alto and                     # Volume ainda importante
+            close[-1] < bb_superior and        # Dentro das Bandas
             self.verificar_horario_favoravel() and  # Horário adequado
-            self.verificar_risco_posicao()          # Gestão de risco ok
+            self.verificar_risco_posicao()      # Gestão de risco ok
         )
 
         sinal_venda = (
-            tendencia_baixa and                     # Tendência principal
-            (macd_venda and rsi_venda) and         # Confirmação obrigatória de ambos
-            stoch_venda and                        # Confirmação estocástica
-            momentum_negativo and                  # Momentum forte
-            volume_alto and                        # Volume significativo
-            close[-1] > bb_inferior and           # Dentro das Bandas
-            self.verificar_resistencia(close[-1], fib_retracement) and  # Próximo à resistência
-            self.verificar_horario_favoravel() and # Horário adequado
-            self.verificar_risco_posicao()         # Gestão de risco ok
+            tendencia_baixa and                 # Tendência de curto prazo
+            (macd_venda or rsi_venda) and      # Apenas uma confirmação necessária
+            (stoch_venda or momentum_negativo) and  # Flexibilidade na confirmação
+            volume_alto and                     # Volume ainda importante
+            close[-1] > bb_inferior and        # Dentro das Bandas
+            self.verificar_horario_favoravel() and  # Horário adequado
+            self.verificar_risco_posicao()      # Gestão de risco ok
         )
 
         if self.operando:
