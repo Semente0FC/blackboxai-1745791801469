@@ -52,55 +52,22 @@ class EstrategiaTrading:
         self.operando = False
 
     def mostrar_analise(self, close, bb_superior, bb_medio, bb_inferior, rsi_valores, macd_line, signal_line):
-        """Mostra a análise técnica através de logs detalhados"""
+        """Mostra apenas informações essenciais da análise"""
         try:
-            # Análise das Bandas de Bollinger
-            distancia_bb = ((close[-1] - bb_medio[-1]) / (bb_superior[-1] - bb_inferior[-1])) * 100
-            posicao_bb = "MEIO"
-            if distancia_bb > 80:
-                posicao_bb = "TOPO"
-            elif distancia_bb < 20:
-                posicao_bb = "FUNDO"
+            # Detectar sinais importantes
+            sinal = None
+            if rsi_valores[-1] < self.rsi_sobrevendido and close[-1] < bb_inferior[-1]:
+                sinal = "🔵 Analisando possível COMPRA..."
+            elif rsi_valores[-1] > self.rsi_sobrecomprado and close[-1] > bb_superior[-1]:
+                sinal = "🔴 Analisando possível VENDA..."
             
-            self.log_system.logar("\n📊 ANÁLISE TÉCNICA DETALHADA:")
-            self.log_system.logar("---------------------------")
-            self.log_system.logar("🎯 Bandas de Bollinger:")
-            self.log_system.logar(f"  • Posição: {posicao_bb}")
-            self.log_system.logar(f"  • Superior: {bb_superior[-1]:.5f}")
-            self.log_system.logar(f"  • Média: {bb_medio[-1]:.5f}")
-            self.log_system.logar(f"  • Inferior: {bb_inferior[-1]:.5f}")
-            
-            # Análise do RSI
-            self.log_system.logar("\n📈 RSI:")
-            self.log_system.logar(f"  • Valor Atual: {rsi_valores[-1]:.2f}")
-            if rsi_valores[-1] > self.rsi_sobrecomprado:
-                self.log_system.logar("  • ALERTA: Região de Sobrecompra!")
-            elif rsi_valores[-1] < self.rsi_sobrevendido:
-                self.log_system.logar("  • ALERTA: Região de Sobrevenda!")
-            
-            # Análise do MACD
-            macd_status = "NEUTRO"
-            if macd_line[-1] > signal_line[-1] and macd_line[-2] <= signal_line[-2]:
-                macd_status = "CRUZAMENTO PARA CIMA ⬆️"
-            elif macd_line[-1] < signal_line[-1] and macd_line[-2] >= signal_line[-2]:
-                macd_status = "CRUZAMENTO PARA BAIXO ⬇️"
-            
-            self.log_system.logar("\n🔄 MACD:")
-            self.log_system.logar(f"  • Status: {macd_status}")
-            self.log_system.logar(f"  • MACD: {macd_line[-1]:.5f}")
-            self.log_system.logar(f"  • Signal: {signal_line[-1]:.5f}")
-            
-            # Resumo da Análise
-            self.log_system.logar("\n📝 RESUMO:")
-            if posicao_bb == "TOPO" and rsi_valores[-1] > self.rsi_sobrecomprado:
-                self.log_system.logar("⚠️ Possível região de venda - Aguardando confirmação")
-            elif posicao_bb == "FUNDO" and rsi_valores[-1] < self.rsi_sobrevendido:
-                self.log_system.logar("⚠️ Possível região de compra - Aguardando confirmação")
-            
-            self.log_system.logar("---------------------------\n")
+            # Mostrar apenas quando houver sinais relevantes
+            if sinal:
+                self.log_system.logar(f"\n{sinal}")
+                self.log_system.logar(f"RSI: {rsi_valores[-1]:.1f} | MACD: {'⬆️' if macd_line[-1] > signal_line[-1] else '⬇️'}")
             
         except Exception as e:
-            self.log_system.logar(f"Erro ao mostrar análise: {e}")
+            self.log_system.logar(f"Erro na análise: {e}")
 
     def analisar_e_operar(self):
         # Carregar dados históricos
@@ -242,13 +209,7 @@ class EstrategiaTrading:
         atr_atual = atr[-1]
         
         if sinal_compra:
-            # Primeiro aviso de possível compra
-            if (tendencia_alta and macd_compra and rsi_compra):
-                self.log_system.logar("🔵 Possível sinal de COMPRA detectado - Aguardando confirmação...")
-                self.log_system.logar("📊 Condições favoráveis:")
-                self.log_system.logar(f"  • Tendência: ALTA")
-                self.log_system.logar(f"  • RSI: {rsi_valores[-1]:.2f}")
-                self.log_system.logar(f"  • MACD: Positivo")
+            self.log_system.logar("🎯 SINAL DE COMPRA DETECTADO")
             
             # Stop Loss e Take Profit otimizados
             sl_distance = atr_atual * 1.5
@@ -261,13 +222,7 @@ class EstrategiaTrading:
                     self.log_system.logar("⚠️ Operação cancelada: Risk/Reward inadequado")
 
         elif sinal_venda:
-            # Primeiro aviso de possível venda
-            if (tendencia_baixa and macd_venda and rsi_venda):
-                self.log_system.logar("🔴 Possível sinal de VENDA detectado - Aguardando confirmação...")
-                self.log_system.logar("📊 Condições favoráveis:")
-                self.log_system.logar(f"  • Tendência: BAIXA")
-                self.log_system.logar(f"  • RSI: {rsi_valores[-1]:.2f}")
-                self.log_system.logar(f"  • MACD: Negativo")
+            self.log_system.logar("🎯 SINAL DE VENDA DETECTADO")
             
             # Stop Loss e Take Profit otimizados
             sl_distance = atr_atual * 1.5
@@ -381,12 +336,8 @@ class EstrategiaTrading:
             self.ticket_atual = resultado.order
             direcao = "COMPRA" if tipo_ordem == mt5.ORDER_TYPE_BUY else "VENDA"
             if self.operando:
-                self.log_system.logar(f"✅ ORDEM DE {direcao} CONFIRMADA E EXECUTADA!")
-                self.log_system.logar(f"📊 Detalhes da Ordem:")
-                self.log_system.logar(f"  • Ticket: {self.ticket_atual}")
-                self.log_system.logar(f"  • Preço: {preco:.5f}")
-                self.log_system.logar(f"  • Stop Loss: {sl:.5f}")
-                self.log_system.logar(f"  • Take Profit: {tp:.5f}")
+                self.log_system.logar(f"✅ {direcao} executada | Ticket: {self.ticket_atual}")
+                self.log_system.logar(f"💰 Preço: {preco:.5f} | SL: {sl:.5f} | TP: {tp:.5f}")
 
     # --- Indicadores Técnicos ---
     def ema(self, data, period):
