@@ -6,28 +6,29 @@ from estrategia import EstrategiaTrading
 from log_system import LogSystem
 import threading
 import time
+from datetime import datetime
 
-
-class PainelApp:
+class PainelApp:  # Changed from EnhancedPainelApp to PainelApp to match imports
     def __init__(self, root):
         self.root = root
-        self.root.title("Future MT5 Trading Panel")
+        self.root.title("Future MT5 Pro Trading")
 
-        # Modern dark theme colors with Spotify style
+        # Modern dark theme colors
         self.colors = {
-            'bg_dark': '#121212',  # Spotify background
-            'bg_medium': '#181818',  # Spotify card color
-            'accent': '#1DB954',  # Spotify green
-            'accent_hover': '#1ed760',  # Lighter green
-            'success': '#1DB954',  # Spotify green
-            'danger': '#e74c3c',  # Keep original red
-            'text': '#FFFFFF',  # White text
-            'text_secondary': '#B3B3B3'  # Gray text
+            'bg_dark': '#0A0A0A',       # Darker background
+            'bg_medium': '#1E1E1E',     # Medium background
+            'bg_light': '#2D2D2D',      # Light background
+            'accent': '#00C853',        # Vibrant green
+            'accent_hover': '#00E676',  # Lighter green
+            'warning': '#FFB300',       # Warning color
+            'danger': '#FF3D00',        # Danger color
+            'text': '#FFFFFF',          # White text
+            'text_secondary': '#B3B3B3' # Gray text
         }
 
         self.root.configure(bg=self.colors['bg_dark'])
         self.root.resizable(False, False)
-        self.centralizar_janela(900, 650)
+        self.centralizar_janela(1000, 700)
 
         self.ativo_selecionado = tk.StringVar()
         self.timeframe_selecionado = tk.StringVar()
@@ -35,7 +36,7 @@ class PainelApp:
         self.operando = False
 
         self.log_system = LogSystem()
-
+        
         self.setup_styles()
         self.setup_ui()
 
@@ -50,80 +51,194 @@ class PainelApp:
         style = ttk.Style()
         style.theme_use('clam')
 
-        # Configure modern looking Combobox
-        style.configure("TCombobox",
-                        fieldbackground=self.colors['bg_medium'],
-                        background=self.colors['bg_medium'],
-                        foreground=self.colors['text'],
-                        arrowcolor=self.colors['accent'],
-                        selectbackground=self.colors['accent'],
-                        selectforeground=self.colors['text'])
-
-        # Configure modern looking Entry
-        style.configure("TEntry",
-                        fieldbackground=self.colors['bg_medium'],
-                        foreground=self.colors['text'])
-
-    def create_gradient_frame(self, parent, color1, color2):
-        frame = tk.Frame(parent, bg=color1, height=2)
-        return frame
+        # Combobox style
+        style.configure("Custom.TCombobox",
+                       fieldbackground=self.colors['bg_light'],
+                       background=self.colors['bg_light'],
+                       foreground=self.colors['text'],
+                       arrowcolor=self.colors['accent'],
+                       selectbackground=self.colors['accent'],
+                       selectforeground=self.colors['text'])
 
     def setup_ui(self):
-        # Header Section with gradient
-        header_frame = tk.Frame(self.root, bg=self.colors['bg_dark'], pady=20)
-        header_frame.pack(fill="x", padx=20)
+        # Main container with padding
+        main_container = tk.Frame(self.root, bg=self.colors['bg_dark'], padx=20, pady=20)
+        main_container.pack(fill="both", expand=True)
 
-        gradient = self.create_gradient_frame(header_frame, self.colors['accent'], self.colors['bg_dark'])
-        gradient.pack(fill="x", pady=(0, 15))
+        # Header with logo and title
+        self.setup_header(main_container)
+        
+        # Trading dashboard
+        self.setup_dashboard(main_container)
+        
+        # Control panel
+        self.setup_control_panel(main_container)
+        
+        # Enhanced log panel
+        self.setup_log_panel(main_container)
 
-        self.bem_vindo_label = tk.Label(
-            header_frame,
-            text="Future MT5 Trading Panel",
-            font=("Helvetica", 24, "bold"),
+        # Start data update threads
+        self.start_update_threads()
+
+    def setup_header(self, parent):
+        header = tk.Frame(parent, bg=self.colors['bg_dark'])
+        header.pack(fill="x", pady=(0, 20))
+
+        # Logo and title container
+        title_container = tk.Frame(header, bg=self.colors['bg_dark'])
+        title_container.pack(side="left")
+
+        logo_label = tk.Label(
+            title_container,
+            text="📈",
+            font=("Helvetica", 32),
             fg=self.colors['accent'],
             bg=self.colors['bg_dark']
         )
-        self.bem_vindo_label.pack()
+        logo_label.pack(side="left", padx=(0, 10))
 
-        self.saldo_label = tk.Label(
-            header_frame,
-            text="Saldo: ---",
-            font=("Helvetica", 16),
-            fg=self.colors['success'],
+        title_label = tk.Label(
+            title_container,
+            text="FUTURE MT5 PRO",
+            font=("Helvetica", 24, "bold"),
+            fg=self.colors['text'],
             bg=self.colors['bg_dark']
         )
-        self.saldo_label.pack(pady=10)
+        title_label.pack(side="left")
 
-        # Options Section
-        options_frame = tk.Frame(self.root, bg=self.colors['bg_dark'])
-        options_frame.pack(pady=20, padx=30)
+        # Balance display
+        self.saldo_frame = tk.Frame(header, bg=self.colors['bg_light'], padx=15, pady=10)
+        self.saldo_frame.pack(side="right")
 
-        # Create a modern looking container for options
-        container = tk.Frame(options_frame, bg=self.colors['bg_medium'], padx=20, pady=20)
-        container.pack(fill="x")
-
-        # Trading Options
-        self.combo_ativo = self.create_combobox(container, self.ativo_selecionado)
-        self.add_labeled_widget(container, "Ativo Trading:", 0, self.combo_ativo)
-
-        self.combo_timeframe = self.create_combobox(
-            container,
-            self.timeframe_selecionado,
-            ["M1", "M5", "M15", "M30", "H1", "H4", "D1"]
-        )
-        self.add_labeled_widget(container, "Timeframe:", 1, self.combo_timeframe)
-
-        self.entry_lote = self.create_entry(container, self.lote_selecionado)
-        self.add_labeled_widget(container, "Tamanho do Lote:", 2, self.entry_lote)
-
-        # Modern update button
-        self.btn_atualizar_ativos = tk.Button(
-            container,
-            text="🔄 Atualizar Ativos",
-            command=self.carregar_ativos,
-            bg=self.colors['accent'],
-            fg=self.colors['text'],
+        tk.Label(
+            self.saldo_frame,
+            text="SALDO",
             font=("Helvetica", 10, "bold"),
+            fg=self.colors['text_secondary'],
+            bg=self.colors['bg_light']
+        ).pack()
+
+        self.saldo_label = tk.Label(
+            self.saldo_frame,
+            text="R$ 0.00",
+            font=("Helvetica", 18, "bold"),
+            fg=self.colors['accent'],
+            bg=self.colors['bg_light']
+        )
+        self.saldo_label.pack()
+
+    def setup_dashboard(self, parent):
+        dashboard = tk.Frame(parent, bg=self.colors['bg_medium'], padx=20, pady=20)
+        dashboard.pack(fill="x", pady=(0, 20))
+
+        # Trading settings
+        settings_frame = tk.Frame(dashboard, bg=self.colors['bg_medium'])
+        settings_frame.pack(fill="x")
+
+        # Asset selection
+        asset_frame = self.create_input_group(settings_frame, "ATIVO")
+        self.combo_ativo = ttk.Combobox(
+            asset_frame,
+            textvariable=self.ativo_selecionado,
+            style="Custom.TCombobox",
+            width=25
+        )
+        self.combo_ativo.pack(fill="x")
+
+        # Timeframe selection
+        timeframe_frame = self.create_input_group(settings_frame, "TIMEFRAME")
+        self.combo_timeframe = ttk.Combobox(
+            timeframe_frame,
+            textvariable=self.timeframe_selecionado,
+            values=["M1", "M5", "M15", "M30", "H1", "H4", "D1"],
+            style="Custom.TCombobox",
+            width=25
+        )
+        self.combo_timeframe.pack(fill="x")
+        self.combo_timeframe.current(1)
+
+        # Lot size input
+        lot_frame = self.create_input_group(settings_frame, "LOTE")
+        self.entry_lote = tk.Entry(
+            lot_frame,
+            textvariable=self.lote_selecionado,
+            font=("Helvetica", 12),
+            bg=self.colors['bg_light'],
+            fg=self.colors['text'],
+            insertbackground=self.colors['text'],
+            relief="flat",
+            width=25
+        )
+        self.entry_lote.pack(fill="x")
+
+        # Organize frames horizontally
+        asset_frame.pack(side="left", padx=(0, 10))
+        timeframe_frame.pack(side="left", padx=10)
+        lot_frame.pack(side="left", padx=(10, 0))
+
+    def create_input_group(self, parent, label):
+        frame = tk.Frame(parent, bg=self.colors['bg_medium'])
+        
+        tk.Label(
+            frame,
+            text=label,
+            font=("Helvetica", 10, "bold"),
+            fg=self.colors['text_secondary'],
+            bg=self.colors['bg_medium']
+        ).pack(anchor="w", pady=(0, 5))
+        
+        return frame
+
+    def setup_control_panel(self, parent):
+        control_panel = tk.Frame(parent, bg=self.colors['bg_medium'], padx=20, pady=20)
+        control_panel.pack(fill="x", pady=(0, 20))
+
+        # Status indicator
+        self.status_label = tk.Label(
+            control_panel,
+            text="⭘ AGUARDANDO",
+            font=("Helvetica", 12, "bold"),
+            fg=self.colors['text_secondary'],
+            bg=self.colors['bg_medium']
+        )
+        self.status_label.pack(side="left")
+
+        # Control buttons
+        buttons_frame = tk.Frame(control_panel, bg=self.colors['bg_medium'])
+        buttons_frame.pack(side="right")
+
+        self.btn_atualizar = self.create_button(
+            buttons_frame,
+            "🔄 Atualizar",
+            self.carregar_ativos,
+            self.colors['bg_light']
+        )
+        self.btn_atualizar.pack(side="left", padx=(0, 10))
+
+        self.btn_iniciar = self.create_button(
+            buttons_frame,
+            "▶ Iniciar Robô",
+            self.iniciar_robô,
+            self.colors['accent']
+        )
+        self.btn_iniciar.pack(side="left", padx=(0, 10))
+
+        self.btn_parar = self.create_button(
+            buttons_frame,
+            "⏹ Parar",
+            self.parar_robô,
+            self.colors['danger']
+        )
+        self.btn_parar.pack(side="left")
+
+    def create_button(self, parent, text, command, color):
+        return tk.Button(
+            parent,
+            text=text,
+            command=command,
+            font=("Helvetica", 11, "bold"),
+            fg=self.colors['text'],
+            bg=color,
             activebackground=self.colors['accent_hover'],
             activeforeground=self.colors['text'],
             relief="flat",
@@ -131,65 +246,38 @@ class PainelApp:
             pady=8,
             cursor="hand2"
         )
-        self.btn_atualizar_ativos.grid(row=0, column=2, padx=20, pady=5, sticky="w")
 
-        # Control Buttons Section
-        button_frame = tk.Frame(self.root, bg=self.colors['bg_dark'])
-        button_frame.pack(pady=20)
+    def setup_log_panel(self, parent):
+        log_container = tk.Frame(parent, bg=self.colors['bg_medium'], padx=20, pady=20)
+        log_container.pack(fill="both", expand=True)
 
-        self.btn_iniciar = tk.Button(
-            button_frame,
-            text="▶ Iniciar Análise com o Robô",
-            command=self.iniciar_robô,
-            bg=self.colors['accent'],
-            fg=self.colors['text'],
-            font=("Helvetica", 14, "bold"),
-            activebackground=self.colors['accent_hover'],
-            activeforeground=self.colors['text'],
-            relief="flat",
-            width=25,
-            state="disabled",
-            cursor="hand2",
-            pady=12
-        )
-        self.btn_iniciar.grid(row=0, column=0, padx=10)
-
-        self.btn_parar = tk.Button(
-            button_frame,
-            text="⏹ Parar Análise",
-            command=self.parar_robô,
-            bg=self.colors['danger'],
-            fg=self.colors['text'],
-            font=("Helvetica", 14, "bold"),
-            activebackground=self.colors['danger'],
-            activeforeground=self.colors['text'],
-            relief="flat",
-            width=20,
-            cursor="hand2",
-            pady=12
-        )
-        self.btn_parar.grid(row=0, column=1, padx=10)
-
-        # Logs Section
-        logs_frame = tk.Frame(self.root, bg=self.colors['bg_dark'])
-        logs_frame.pack(pady=20, fill="both", expand=True, padx=30)
+        # Log header
+        header_frame = tk.Frame(log_container, bg=self.colors['bg_medium'])
+        header_frame.pack(fill="x", pady=(0, 10))
 
         tk.Label(
-            logs_frame,
-            text="📋 Logs do Sistema",
-            font=("Helvetica", 14, "bold"),
-            fg=self.colors['text'],
-            bg=self.colors['bg_dark']
-        ).pack(anchor="w")
+            header_frame,
+            text="LOGS DO SISTEMA",
+            font=("Helvetica", 10, "bold"),
+            fg=self.colors['text_secondary'],
+            bg=self.colors['bg_medium']
+        ).pack(side="left")
 
-        text_frame = tk.Frame(logs_frame, bg=self.colors['bg_medium'])
-        text_frame.pack(fill="both", expand=True)
+        # Current time
+        self.time_label = tk.Label(
+            header_frame,
+            text="",
+            font=("Helvetica", 10),
+            fg=self.colors['text_secondary'],
+            bg=self.colors['bg_medium']
+        )
+        self.time_label.pack(side="right")
 
+        # Log text area
         self.text_log = tk.Text(
-            text_frame,
+            log_container,
             height=15,
-            width=90,
-            bg=self.colors['bg_medium'],
+            bg=self.colors['bg_light'],
             fg=self.colors['text'],
             insertbackground=self.colors['text'],
             relief="flat",
@@ -199,69 +287,33 @@ class PainelApp:
         )
         self.text_log.pack(side="left", fill="both", expand=True)
 
-        # Modern scrollbar
-        self.scrollbar = tk.Scrollbar(
-            text_frame,
-            command=self.text_log.yview,
-            width=10,
-            relief="flat",
-            bg=self.colors['bg_medium']
-        )
-        self.scrollbar.pack(side="right", fill="y", padx=2)
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(log_container, command=self.text_log.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.text_log.config(yscrollcommand=scrollbar.set)
 
-        self.text_log.config(yscrollcommand=self.scrollbar.set)
+        # Connect log system
         self.log_system.conectar_interface(self.text_log)
 
-        # Footer with gradient
-        footer_frame = tk.Frame(self.root, bg=self.colors['bg_dark'])
-        footer_frame.pack(fill="x", pady=(0, 10))
-
-        gradient = self.create_gradient_frame(footer_frame, self.colors['bg_dark'], self.colors['accent'])
-        gradient.pack(fill="x")
-
+    def start_update_threads(self):
+        # Update balance
+        threading.Thread(target=self.atualizar_saldo_loop, daemon=True).start()
+        # Update time
+        threading.Thread(target=self.atualizar_hora_loop, daemon=True).start()
+        # Load initial assets
         self.carregar_ativos()
 
-        # Setup variable traces
-        self.ativo_selecionado.trace_add("write", self.verificar_campos)
-        self.timeframe_selecionado.trace_add("write", self.verificar_campos)
-        self.lote_selecionado.trace_add("write", self.verificar_campos)
+    def atualizar_hora_loop(self):
+        while True:
+            current_time = datetime.now().strftime("%H:%M:%S")
+            self.time_label.config(text=current_time)
+            time.sleep(1)
 
-        # Start balance update thread
-        threading.Thread(target=self.atualizar_saldo_loop, daemon=True).start()
-
-    def add_labeled_widget(self, parent, label_text, row, widget):
-        tk.Label(
-            parent,
-            text=label_text,
-            font=("Helvetica", 12),
-            fg=self.colors['text'],
-            bg=self.colors['bg_medium']
-        ).grid(row=row, column=0, padx=10, pady=10, sticky="e")
-        widget.grid(row=row, column=1, pady=10, sticky="w")
-
-    def create_combobox(self, parent, variable, values=None):
-        combo = ttk.Combobox(
-            parent,
-            textvariable=variable,
-            width=30,
-            values=values or [],
-            style="TCombobox"
-        )
-        if values:
-            combo.current(1)
-        return combo
-
-    def create_entry(self, parent, variable):
-        return tk.Entry(
-            parent,
-            textvariable=variable,
-            font=("Helvetica", 12),
-            bg=self.colors['bg_medium'],
-            fg=self.colors['text'],
-            relief="flat",
-            width=25,
-            insertbackground=self.colors['text']  # Cursor color
-        )
+    def atualizar_saldo_loop(self):
+        while True:
+            saldo = obter_saldo()
+            self.saldo_label.config(text=f"R$ {saldo:.2f}")
+            time.sleep(5)
 
     def carregar_ativos(self):
         try:
@@ -273,12 +325,6 @@ class PainelApp:
             self.log_system.logar("✅ Ativos atualizados com sucesso!")
         except Exception as e:
             self.log_system.logar(f"❌ Erro ao carregar ativos: {e}")
-
-    def atualizar_saldo_loop(self):
-        while True:
-            saldo = obter_saldo()
-            self.saldo_label.config(text=f"Saldo: R$ {saldo:.2f}")
-            time.sleep(5)
 
     def verificar_campos(self, *args):
         ativo = self.ativo_selecionado.get().strip()
@@ -346,6 +392,7 @@ class PainelApp:
             self.log_system.logar(f"✅ Mercado para o ativo {ativo} está ABERTO.")
 
         self.operando = True
+        self.status_label.config(text="● OPERANDO", fg=self.colors['accent'])
         self.log_system.logar(
             f"✅ Ambiente OK. Iniciando análise no ativo {ativo}, timeframe {timeframe}, lote {lote_float}. Spread atual: {spread:.1f} pontos.")
         self.estrategia = EstrategiaTrading(ativo, timeframe, lote_float, self.log_system)
@@ -353,6 +400,12 @@ class PainelApp:
 
     def parar_robô(self):
         self.operando = False
+        self.status_label.config(text="⭘ AGUARDANDO", fg=self.colors['text_secondary'])
         if hasattr(self, 'estrategia'):
             self.estrategia.parar()
         self.log_system.logar("🛑 Análise parada.")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = PainelApp(root)
+    root.mainloop()
