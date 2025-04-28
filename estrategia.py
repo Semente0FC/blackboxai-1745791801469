@@ -12,6 +12,10 @@ class EstrategiaTrading:
         self.operando = True
         self.log_system = log_system
         self.ticket_atual = None
+        
+        # Identificadores para objetos gráficos
+        self.chart_objects = []
+        self.object_count = 0
 
         # Parâmetros otimizados para maior assertividade
         self.rsi_sobrecomprado = 75  # Mais conservador para vendas
@@ -51,9 +55,94 @@ class EstrategiaTrading:
     def parar(self):
         self.operando = False
 
+    def limpar_objetos_grafico(self):
+        """Limpa todos os objetos gráficos criados"""
+        for obj_name in self.chart_objects:
+            mt5.object_delete(obj_name)
+        self.chart_objects = []
+        self.object_count = 0
+
+    def criar_objeto_grafico(self, tipo, nome, preco, cor, descricao=""):
+        """Cria um objeto gráfico no chart"""
+        obj_name = f"{nome}_{self.object_count}"
+        self.object_count += 1
+        
+        tempo_atual = mt5.symbol_info_tick(self.ativo).time
+        
+        if tipo == "arrow":
+            # Criar seta
+            if mt5.symbol_select(self.ativo, True):
+                arrow = mt5.ANCHOR_TOP if cor == "verde" else mt5.ANCHOR_BOTTOM
+                if mt5.object_create(
+                    self.ativo,  # símbolo
+                    obj_name,    # nome do objeto
+                    mt5.OBJPROP_ARROW,  # tipo de objeto
+                    0,          # subjanela
+                    tempo_atual,  # tempo do ponto de ancoragem
+                    preco,      # preço do ponto de ancoragem
+                    ):
+                    # Configurar propriedades da seta
+                    mt5.object_set_integer(self.ativo, obj_name, mt5.OBJPROP_ARROWCODE, 241 if cor == "verde" else 242)
+                    mt5.object_set_integer(self.ativo, obj_name, mt5.OBJPROP_COLOR, 0x00FF00 if cor == "verde" else 0xFF0000)
+                    mt5.object_set_integer(self.ativo, obj_name, mt5.OBJPROP_WIDTH, 2)
+                    mt5.object_set_integer(self.ativo, obj_name, mt5.OBJPROP_ANCHOR, arrow)
+                    mt5.object_set_string(self.ativo, obj_name, mt5.OBJPROP_TOOLTIP, descricao)
+        
+        elif tipo == "linha":
+            # Criar linha de tendência
+            if mt5.symbol_select(self.ativo, True):
+                if mt5.object_create(
+                    self.ativo,  # símbolo
+                    obj_name,    # nome do objeto
+                    mt5.OBJPROP_TREND,  # tipo de objeto
+                    0,          # subjanela
+                    tempo_atual - 10 * self.timeframe,  # tempo do primeiro ponto
+                    preco,      # preço do primeiro ponto
+                    tempo_atual + 10 * self.timeframe,  # tempo do segundo ponto
+                    preco       # preço do segundo ponto
+                    ):
+                    # Configurar propriedades da linha
+                    cor_linha = 0x00FF00 if cor == "verde" else (0x0000FF if cor == "azul" else 0xFF0000)
+                    mt5.object_set_integer(self.ativo, obj_name, mt5.OBJPROP_COLOR, cor_linha)
+                    mt5.object_set_integer(self.ativo, obj_name, mt5.OBJPROP_STYLE, mt5.STYLE_SOLID)
+                    mt5.object_set_integer(self.ativo, obj_name, mt5.OBJPROP_WIDTH, 1)
+                    mt5.object_set_string(self.ativo, obj_name, mt5.OBJPROP_TOOLTIP, descricao)
+        
+        self.chart_objects.append(obj_name)
+
+    def desenhar_analise(self, close, bb_superior, bb_medio, bb_inferior, rsi_valores, macd_line, signal_line):
+        """Desenha a análise técnica no gráfico"""
+        try:
+            # Limpar objetos anteriores
+            self.limpar_objetos_grafico()
+            
+            # Desenhar Bandas de Bollinger
+            self.criar_objeto_grafico("linha", "BB_Superior", bb_superior[-1], "verde", "Banda Superior")
+            self.criar_objeto_grafico("linha", "BB_Media", bb_medio[-1], "azul", "Média Móvel")
+            self.criar_objeto_grafico("linha", "BB_Inferior", bb_inferior[-1], "verde", "Banda Inferior")
+            
+            # Marcar níveis de RSI
+            if rsi_valores[-1] > self.rsi_sobrecomprado:
+                self.criar_objeto_grafico("arrow", "RSI_Alto", close[-1], "vermelho", f"RSI Sobrecomprado: {rsi_valores[-1]:.2f}")
+            elif rsi_valores[-1] < self.rsi_sobrevendido:
+                self.criar_objeto_grafico("arrow", "RSI_Baixo", close[-1], "verde", f"RSI Sobrevendido: {rsi_valores[-1]:.2f}")
+            
+            # Marcar cruzamentos do MACD
+            if macd_line[-1] > signal_line[-1] and macd_line[-2] <= signal_line[-2]:
+                self.criar_objeto_grafico("arrow", "MACD_Cruz_Alta", close[-1], "verde", "Cruzamento MACD para cima")
+            elif macd_line[-1] < signal_line[-1] and macd_line[-2] >= signal_line[-2]:
+                self.criar_objeto_grafico("arrow", "MACD_Cruz_Baixa", close[-1], "vermelho", "Cruzamento MACD para baixo")
+            
+        except Exception as e:
+            self.log_system.logar(f"Erro ao desenhar análise: {e}")
+
     def analisar_e_operar(self):
+        # Abrir gráfico do ativo se ainda não estiver aberto
+        mt5.symbol_select(self.ativo, True)
+        
         # Carregar dados históricos
-        self.log_system.logar("📊 Analisando mercado...")
+        if self.operando:
+            self.log_system.logar("📊 Analisando mercado...")
         barras = mt5.copy_rates_from_pos(self.ativo, self.timeframe, 0, 200)
         if barras is None or len(barras) < 100:
             self.log_system.logar(f"❌ Erro: Não foi possível carregar velas de {self.ativo}")
@@ -188,6 +277,9 @@ class EstrategiaTrading:
             self.verificar_risco_posicao()         # Gestão de risco ok
         )
 
+        # Desenhar análise no gráfico
+        self.desenhar_analise(close, bb_superior, bb_medio, bb_inferior, rsi_valores, macd_line, signal_line)
+        
         # Gestão de Risco e Execução
         atr_atual = atr[-1]
         
