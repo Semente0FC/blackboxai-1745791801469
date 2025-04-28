@@ -103,9 +103,6 @@ class EstrategiaTrading:
             self.log_system.logar(f"Erro ao mostrar análise: {e}")
 
     def analisar_e_operar(self):
-        # Abrir gráfico do ativo se ainda não estiver aberto
-        mt5.symbol_select(self.ativo, True)
-        
         # Carregar dados históricos
         if self.operando:
             self.log_system.logar("📊 Analisando mercado...")
@@ -243,8 +240,9 @@ class EstrategiaTrading:
             self.verificar_risco_posicao()         # Gestão de risco ok
         )
 
-        # Mostrar análise detalhada
-        self.mostrar_analise(close, bb_superior, bb_medio, bb_inferior, rsi_valores, macd_line, signal_line)
+        if self.operando:
+            # Mostrar análise detalhada
+            self.mostrar_analise(close, bb_superior, bb_medio, bb_inferior, rsi_valores, macd_line, signal_line)
         
         # Gestão de Risco e Execução
         atr_atual = atr[-1]
