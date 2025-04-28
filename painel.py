@@ -13,8 +13,8 @@ class PainelApp:  # Changed from EnhancedPainelApp to PainelApp to match imports
         self.root = root
         self.root.title("Future MT5 Pro Trading")
 
-        # Modern dark theme colors
-        self.colors = {
+        # Theme colors
+        self.dark_theme = {
             'bg_dark': '#0A0A0A',       # Darker background
             'bg_medium': '#1E1E1E',     # Medium background
             'bg_light': '#2D2D2D',      # Light background
@@ -25,6 +25,21 @@ class PainelApp:  # Changed from EnhancedPainelApp to PainelApp to match imports
             'text': '#FFFFFF',          # White text
             'text_secondary': '#B3B3B3' # Gray text
         }
+        
+        self.light_theme = {
+            'bg_dark': '#F5F5F5',       # Light gray background
+            'bg_medium': '#FFFFFF',      # White background
+            'bg_light': '#FAFAFA',      # Very light gray
+            'accent': '#00C853',        # Keep green
+            'accent_hover': '#00E676',  # Keep hover
+            'warning': '#FFB300',       # Keep warning
+            'danger': '#FF3D00',        # Keep danger
+            'text': '#212121',          # Dark text
+            'text_secondary': '#757575'  # Gray text
+        }
+        
+        self.is_dark_mode = True
+        self.colors = self.dark_theme
 
         self.root.configure(bg=self.colors['bg_dark'])
         self.root.resizable(False, False)
@@ -66,6 +81,10 @@ class PainelApp:  # Changed from EnhancedPainelApp to PainelApp to match imports
         main_container.pack(fill="both", expand=True)
 
         # Header with logo and title
+        # Theme switcher
+        self.setup_theme_switcher(main_container)
+        
+        # Header
         self.setup_header(main_container)
         
         # Trading dashboard
@@ -79,6 +98,88 @@ class PainelApp:  # Changed from EnhancedPainelApp to PainelApp to match imports
 
         # Start data update threads
         self.start_update_threads()
+
+    def setup_theme_switcher(self, parent):
+        switcher_frame = tk.Frame(parent, bg=self.colors['bg_dark'])
+        switcher_frame.pack(fill="x", pady=(0, 10))
+        
+        self.theme_button = tk.Button(
+            switcher_frame,
+            text="☀️ Modo Claro" if self.is_dark_mode else "🌙 Modo Escuro",
+            command=self.toggle_theme,
+            font=("Helvetica", 10, "bold"),
+            fg=self.colors['text'],
+            bg=self.colors['bg_light'],
+            activebackground=self.colors['accent_hover'],
+            activeforeground=self.colors['text'],
+            relief="flat",
+            padx=10,
+            pady=5,
+            cursor="hand2"
+        )
+        self.theme_button.pack(side="right")
+
+    def toggle_theme(self):
+        self.is_dark_mode = not self.is_dark_mode
+        self.colors = self.dark_theme if self.is_dark_mode else self.light_theme
+        
+        # Update theme button
+        self.theme_button.config(
+            text="☀️ Modo Claro" if self.is_dark_mode else "🌙 Modo Escuro",
+            fg=self.colors['text'],
+            bg=self.colors['bg_light']
+        )
+        
+        # Update all widgets
+        self.update_theme()
+
+    def update_theme(self):
+        # Update root
+        self.root.configure(bg=self.colors['bg_dark'])
+        
+        # Update all frames and widgets
+        for widget in self.root.winfo_children():
+            self.update_widget_colors(widget)
+
+    def update_widget_colors(self, widget):
+        widget_type = widget.winfo_class()
+        
+        if widget_type in ['Frame', 'Labelframe']:
+            if widget.cget('bg') in [self.dark_theme['bg_dark'], self.light_theme['bg_dark']]:
+                widget.configure(bg=self.colors['bg_dark'])
+            elif widget.cget('bg') in [self.dark_theme['bg_medium'], self.light_theme['bg_medium']]:
+                widget.configure(bg=self.colors['bg_medium'])
+            elif widget.cget('bg') in [self.dark_theme['bg_light'], self.light_theme['bg_light']]:
+                widget.configure(bg=self.colors['bg_light'])
+        
+        elif widget_type == 'Label':
+            widget.configure(
+                bg=widget.master.cget('bg'),
+                fg=self.colors['text'] if widget.cget('fg') == self.dark_theme['text'] else self.colors['text_secondary']
+            )
+        
+        elif widget_type == 'Button':
+            if widget.cget('bg') == self.colors['accent']:
+                # Don't change accent buttons
+                pass
+            else:
+                widget.configure(
+                    bg=self.colors['bg_light'],
+                    fg=self.colors['text'],
+                    activebackground=self.colors['accent_hover'],
+                    activeforeground=self.colors['text']
+                )
+        
+        elif widget_type == 'Text':
+            widget.configure(
+                bg=self.colors['bg_light'],
+                fg=self.colors['text'],
+                insertbackground=self.colors['text']
+            )
+        
+        # Update children widgets
+        for child in widget.winfo_children():
+            self.update_widget_colors(child)
 
     def setup_header(self, parent):
         header = tk.Frame(parent, bg=self.colors['bg_dark'])
