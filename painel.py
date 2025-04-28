@@ -74,15 +74,27 @@ class PainelApp:  # Changed from EnhancedPainelApp to PainelApp to match imports
                        arrowcolor=self.colors['accent'],
                        selectbackground=self.colors['accent'],
                        selectforeground=self.colors['text'])
+        
+        # Update style on theme change
+        self.root.bind('<<ThemeChanged>>', lambda e: self.update_styles())
+
+    def update_styles(self):
+        style = ttk.Style()
+        style.configure("Custom.TCombobox",
+                       fieldbackground=self.colors['bg_light'],
+                       background=self.colors['bg_light'],
+                       foreground=self.colors['text'],
+                       arrowcolor=self.colors['accent'],
+                       selectbackground=self.colors['accent'],
+                       selectforeground=self.colors['text'])
 
     def setup_ui(self):
+        # Theme switcher at the very top
+        self.setup_theme_switcher(self.root)
+
         # Main container with padding
         main_container = tk.Frame(self.root, bg=self.colors['bg_dark'], padx=20, pady=20)
         main_container.pack(fill="both", expand=True)
-
-        # Header with logo and title
-        # Theme switcher
-        self.setup_theme_switcher(main_container)
         
         # Header
         self.setup_header(main_container)
@@ -100,9 +112,15 @@ class PainelApp:  # Changed from EnhancedPainelApp to PainelApp to match imports
         self.start_update_threads()
 
     def setup_theme_switcher(self, parent):
+        # Create a frame at the top of the window
         switcher_frame = tk.Frame(parent, bg=self.colors['bg_dark'])
-        switcher_frame.pack(fill="x", pady=(0, 10))
+        switcher_frame.pack(fill="x")
         
+        # Add padding frame to position the button
+        padding_frame = tk.Frame(switcher_frame, bg=self.colors['bg_dark'], height=10)
+        padding_frame.pack(fill="x")
+        
+        # Create the theme toggle button with a more visible style
         self.theme_button = tk.Button(
             switcher_frame,
             text="☀️ Modo Claro" if self.is_dark_mode else "🌙 Modo Escuro",
@@ -113,25 +131,32 @@ class PainelApp:  # Changed from EnhancedPainelApp to PainelApp to match imports
             activebackground=self.colors['accent_hover'],
             activeforeground=self.colors['text'],
             relief="flat",
-            padx=10,
-            pady=5,
+            padx=15,
+            pady=8,
             cursor="hand2"
         )
-        self.theme_button.pack(side="right")
+        self.theme_button.pack(side="right", padx=20, pady=5)
 
     def toggle_theme(self):
         self.is_dark_mode = not self.is_dark_mode
         self.colors = self.dark_theme if self.is_dark_mode else self.light_theme
         
-        # Update theme button
+        # Update theme button with animation effect
         self.theme_button.config(
             text="☀️ Modo Claro" if self.is_dark_mode else "🌙 Modo Escuro",
             fg=self.colors['text'],
             bg=self.colors['bg_light']
         )
         
+        # Create animation effect
+        self.theme_button.config(relief="sunken")
+        self.root.after(100, lambda: self.theme_button.config(relief="flat"))
+        
         # Update all widgets
         self.update_theme()
+        
+        # Generate theme changed event
+        self.root.event_generate('<<ThemeChanged>>')
 
     def update_theme(self):
         # Update root
