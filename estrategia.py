@@ -228,6 +228,15 @@ class EstrategiaTrading:
         return True
 
     def abrir_ordem(self, tipo_ordem, sl_distance, tp_distance):
+        # Verificar se AutoTrading está habilitado
+        if not mt5.terminal_info().trade_allowed:
+            self.log_system.logar("❌ AutoTrading está desabilitado no MT5!")
+            self.log_system.logar("ℹ️ Para habilitar o AutoTrading:")
+            self.log_system.logar("1. Clique no botão 'AutoTrading' no topo do MT5 (botão com ícone '⚡')")
+            self.log_system.logar("2. Verifique se o AutoTrading está permitido nas configurações do Expert Advisor")
+            self.log_system.logar("3. Certifique-se que o botão está verde")
+            return
+
         tick = mt5.symbol_info_tick(self.ativo)
         if tick is None:
             if self.operando:
